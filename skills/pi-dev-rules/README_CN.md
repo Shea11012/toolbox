@@ -71,42 +71,6 @@ cp -r pi-dev-rules ~/.claude/skills/      # 示例：Claude Code，全局
 
 npm 包目录单独刷新：运行 `python3 scripts/fetch-pi-packages.py`，成功后更新 `SKILL.md`、`references/packages-catalog.md` 和中英文 README 中的目录日期及数量。离线文档刷新会保留包目录文件。
 
-## 支持
-
-如果这个项目对你有帮助，欢迎支持作者：
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/Agents365-ai/images_payment/main/qrcode/wechat-pay.png" width="180" alt="微信支付">
-      <br>
-      <b>微信支付</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/Agents365-ai/images_payment/main/qrcode/alipay.png" width="180" alt="支付宝">
-      <br>
-      <b>支付宝</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/Agents365-ai/images_payment/main/qrcode/buymeacoffee.png" width="180" alt="Buy Me a Coffee">
-      <br>
-      <b>Buy Me a Coffee</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/Agents365-ai/images_payment/main/awarding/award.gif" width="180" alt="打赏作者">
-      <br>
-      <b>打赏作者</b>
-    </td>
-  </tr>
-</table>
-
-## 作者
-
-**Agents365-ai**
-
-- Bilibili: <https://space.bilibili.com/441831884>
-- GitHub: <https://github.com/Agents365-ai>
-
 ## 许可证
 
 [MIT](LICENSE)
