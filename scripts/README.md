@@ -6,7 +6,6 @@
 
 | 脚本 | 用途 | 用法 |
 |------|------|------|
-| `backup-hermes.sh` | Hermes + OpenViking 数据备份/还原 | cronjob 日备份；`restore <tar.gz>` 手动还原 |
 | `docker-migrate.sh` | docker-compose 项目跨机器迁移 | `-t y7000p -c ./project`，自动导出镜像+volume+配置 |
 | `koodo-backup.sh` | Koodo Reader 数据备份 | 对齐应用内 backupFromPath 逻辑，输出日期 zip |
 
@@ -34,7 +33,6 @@
 
 ## 依赖
 
-- `backup-hermes.sh`: tar, xz, ssh, OpenViking HTTP API（如果备份知识库内容）
 - `docker-migrate.sh`: docker, rsync, jq, alpine 镜像（volume 导出用）
 - `sync.sh`: jj, rclone
 - `rclone.sh`: rclone

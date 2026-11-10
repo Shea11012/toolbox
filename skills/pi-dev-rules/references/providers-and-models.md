@@ -1,0 +1,917 @@
+# Pi — Providers & Models
+
+> Official @earendil-works/pi-coding-agent 1.5.0 documentation.
+> Refreshed from the installed package on 2026-11-10; not a live `latest` mirror.
+
+Source: <https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/providers.md>
+
+# Providers
+
+Most hosted providers support one or both of these authentication methods:
+
+- Sign in through a browser or device flow backed by OAuth.
+- Provide an API key.
+
+Use `/login [provider]` to see the methods supported by a provider. Amazon Bedrock and Google Vertex AI can also use ambient cloud credentials.
+
+## Authenticate interactively
+
+Run `/login` and select a provider. Pi guides you through its OAuth or API-key flow and saves the resulting credential in [`auth.json`](configuration.md#agent-directory).
+
+On a remote or headless machine, an OAuth callback may not reach the local process. When prompted, paste the final redirect URL or authorization code back into Pi.
+
+Run `/logout` and select a provider to remove its stored credential. This does not unset environment variables, remove authentication from `models.json`, or revoke the credential at the provider.
+
+`auth.json` can contain API keys and OAuth tokens. Keep it private and do not commit it.
+
+## Use an API key from the environment
+
+Environment variables are useful in CI and anywhere Pi should not store the key. Set the variable before starting Pi:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+pi
+```
+
+This table covers providers with a single primary API-key variable. Providers that need additional configuration or support ambient credentials are covered under [Provider Specific Config](#provider-specific-config).
+
+| Provider | Environment variable |
+|---|---|
+| Anthropic | `ANTHROPIC_API_KEY` |
+| Ant Ling | `ANT_LING_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| NVIDIA NIM | `NVIDIA_API_KEY` |
+| Google Gemini | `GEMINI_API_KEY` |
+| GitHub Copilot | `COPILOT_GITHUB_TOKEN` |
+| Mistral | `MISTRAL_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| Cerebras | `CEREBRAS_API_KEY` |
+| xAI | `XAI_API_KEY` |
+| OpenRouter | `OPENROUTER_API_KEY` |
+| Vercel AI Gateway | `AI_GATEWAY_API_KEY` |
+| ZAI Coding Plan (Global) | `ZAI_API_KEY` |
+| ZAI Coding Plan (China) | `ZAI_CODING_CN_API_KEY` |
+| OpenCode Zen and Go | `OPENCODE_API_KEY` |
+| Radius | `RADIUS_API_KEY` |
+| TypeSafe ([classifier models](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models.md#use-classifier-models)) | `TYPESAFE_API_KEY` |
+| Hugging Face | `HF_TOKEN` |
+| Fireworks | `FIREWORKS_API_KEY` |
+| Together AI | `TOGETHER_API_KEY` |
+| Baseten | `BASETEN_API_KEY` |
+| Kimi For Coding | `KIMI_API_KEY` |
+| Meta | `META_API_KEY` |
+| MiniMax | `MINIMAX_API_KEY` |
+| MiniMax (China) | `MINIMAX_CN_API_KEY` |
+| Moonshot AI (Global and China) | `MOONSHOT_API_KEY` |
+| Qwen Token Plan and Individual | `QWEN_TOKEN_PLAN_API_KEY` |
+| Qwen Token Plan (China) | `QWEN_TOKEN_PLAN_CN_API_KEY` |
+| Xiaomi MiMo | `XIAOMI_API_KEY` |
+| Xiaomi MiMo Token Plan (China) | `XIAOMI_TOKEN_PLAN_CN_API_KEY` |
+| Xiaomi MiMo Token Plan (Amsterdam) | `XIAOMI_TOKEN_PLAN_AMS_API_KEY` |
+| Xiaomi MiMo Token Plan (Singapore) | `XIAOMI_TOKEN_PLAN_SGP_API_KEY` |
+
+Anthropic also recognizes `ANTHROPIC_OAUTH_TOKEN` as an API credential and `ANTHROPIC_AUTH_TOKEN` as bearer authentication.
+
+With no key or token set, Anthropic uses workload identity federation when `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID` and `ANTHROPIC_IDENTITY_TOKEN_FILE` are set: the Anthropic SDK exchanges the identity token for a short-lived access token and refreshes it itself (re-reading the identity token file, so keep that file fresh for long sessions). `ANTHROPIC_SERVICE_ACCOUNT_ID` and `ANTHROPIC_WORKSPACE_ID` are passed through when set.
+
+## Load an API key from a command
+
+To use a secret manager without writing the resolved key to disk, set a provider's `key` in `auth.json` to a command prefixed with `!`:
+
+```json
+{
+  "anthropic": {
+    "type": "api_key",
+    "key": "!security find-generic-password -ws 'anthropic'"
+  }
+}
+```
+
+Pi runs the command when the key is first needed and caches its standard output for the process lifetime. Empty output, a timeout, or a nonzero exit leaves the key unresolved until Pi restarts.
+
+## Provider Specific Config
+
+The providers below have additional setup, need additional settings, or can use credentials supplied by their platform.
+
+A stored API-key credential can include an `env` object. Its values take priority over the process environment for that provider:
+
+```json
+{
+  "cloudflare-workers-ai": {
+    "type": "api_key",
+    "key": "...",
+    "env": {
+      "CLOUDFLARE_ACCOUNT_ID": "account-id"
+    }
+  }
+}
+```
+
+### Radius
+
+Radius is a service crafted for Pi by the builders of Pi, Earendil Works. It provides a customizable AI gateway with organization-level controls and analytics built in, and artifacts for sharing what you create with Pi.
+
+To get started, run `/login radius` in Pi. This adds Radius as a provider, and its models appear in `/model` like any other provider's.
+
+Radius also has an MCP server, so Pi can manage Radius for you.
+
+Radius is currently in early alpha and evolving quickly. See [radius.earendil.com](https://radius.earendil.com) for more.
+
+Radius authentication uses its gateway catalog and caches refreshed model metadata for later offline startup. A custom Radius gateway configured in `models.json` uses its own catalog rather than inheriting the public `radius.pi.dev` catalog.
+
+### OpenRouter
+
+Authenticate with `/login openrouter` or `OPENROUTER_API_KEY`.
+
+With a key, Pi lists only the OpenRouter chat models that key may use, with the key's context size, max output, and prices. These come from OpenRouter's `/models/user` endpoint and reflect guardrails and provider restrictions set in OpenRouter. Image and classifier models are not filtered.
+
+Pi refreshes the list in the background at startup in interactive mode, when `/model` opens, after `/login`, and on `pi update --models`. The last list is saved and used offline and in `pi -p` and RPC mode. After switching keys outside `/login`, the previous key's list stays until the next refresh.
+
+Regional endpoints filter models to their region. To use one, set the base URL in [`models.json`](models.md#configure-a-compatible-endpoint):
+
+```json
+{
+  "providers": {
+    "openrouter": { "baseUrl": "https://us.openrouter.ai/api/v1" }
+  }
+}
+```
+
+If the base URL rejects the key at `/models/user` or does not have that endpoint, for example a proxy configured as the OpenRouter base URL, Pi lists every OpenRouter model.
+
+### Azure OpenAI
+
+The provider ID is `azure` (formerly `azure-openai-responses`). Use it as the key in `auth.json`, `models.json`, and `settings.json`, and in model references such as `--model azure/gpt-5.4`.
+
+The `azure` provider serves OpenAI models through the Responses API and Microsoft Foundry models through Chat Completions, such as `azure/deepseek-v4-pro`.
+
+Set an API key plus either a base URL or resource name:
+
+```bash
+export AZURE_OPENAI_API_KEY=...
+export AZURE_OPENAI_BASE_URL=https://your-resource.ai.azure.com
+# Or:
+export AZURE_OPENAI_RESOURCE_NAME=your-resource
+```
+
+Resource root URLs under `ai.azure.com`, `cognitiveservices.azure.com`, and `openai.azure.com` are normalized to the OpenAI API path.
+
+Pi sends the model ID as the deployment name. If a deployment has a different name, map it with `AZURE_OPENAI_DEPLOYMENT_NAME_MAP`:
+
+```bash
+export AZURE_OPENAI_DEPLOYMENT_NAME_MAP=gpt-5.4=my-gpt-deployment,deepseek-v4-pro=my-deepseek
+```
+
+`AZURE_OPENAI_API_VERSION` overrides the API version for OpenAI models (default `v1`).
+
+To use a Foundry model that Pi does not include, add it under `azure` in [`models.json`](models.md#configure-a-compatible-endpoint) with `api: "openai-completions"`. Custom models require a `baseUrl`; `AZURE_OPENAI_BASE_URL` and `AZURE_OPENAI_RESOURCE_NAME` take priority over it when set:
+
+```json
+{
+  "providers": {
+    "azure": {
+      "baseUrl": "https://your-resource.services.ai.azure.com",
+      "models": [
+        { "id": "your-deployment", "api": "openai-completions" }
+      ]
+    }
+  }
+}
+```
+
+### Amazon Bedrock
+
+Bedrock can use a bearer token or an ambient AWS credential source:
+
+```bash
+# Named profile
+export AWS_PROFILE=your-profile
+
+# IAM keys
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+# Required for temporary credentials
+export AWS_SESSION_TOKEN=...
+
+# Bedrock bearer token
+export AWS_BEARER_TOKEN_BEDROCK=...
+
+# Region, when not supplied by the profile or AWS SDK configuration
+export AWS_REGION=us-west-2
+# AWS_DEFAULT_REGION is also supported
+```
+
+Pi also supports ECS task credentials and IRSA through the standard `AWS_CONTAINER_CREDENTIALS_*` and `AWS_WEB_IDENTITY_TOKEN_FILE` variables.
+
+### Cloudflare AI Gateway
+
+The gateway requires a token, account ID, and gateway ID:
+
+```bash
+export CLOUDFLARE_API_KEY=...
+export CLOUDFLARE_ACCOUNT_ID=...
+export CLOUDFLARE_GATEWAY_ID=...
+```
+
+The account and gateway IDs can come from the process environment or the credential's `env` object in `auth.json`.
+
+`CLOUDFLARE_API_KEY` authenticates Pi to the gateway. Upstream access can use Cloudflare unified billing, credentials stored in the gateway, or an `Authorization` header configured for the provider in `models.json`.
+
+### Cloudflare Workers AI
+
+Workers AI requires a token and account ID:
+
+```bash
+export CLOUDFLARE_API_KEY=...
+export CLOUDFLARE_ACCOUNT_ID=...
+```
+
+The account ID can also be stored in the credential's `env` object.
+
+### Google Vertex AI
+
+Use a Google Cloud API key:
+
+```bash
+export GOOGLE_CLOUD_API_KEY=...
+```
+
+To use Application Default Credentials, configure a project and location:
+
+```bash
+export GOOGLE_CLOUD_PROJECT=your-project
+# GCLOUD_PROJECT is also supported
+export GOOGLE_CLOUD_LOCATION=us-central1
+```
+
+Then authenticate:
+
+```bash
+gcloud auth application-default login
+```
+
+To use a service-account key file instead, set `GOOGLE_APPLICATION_CREDENTIALS` along with the project and location.
+
+---
+
+Source: <https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models.md>
+
+# Choose a Model
+
+For a built-in provider, start with `/login`, then choose a model with `/model`. Use custom model configuration only when Pi does not already include the provider or endpoint you need.
+
+## Choose a connection
+
+| What you have | Recommended setup |
+|---|---|
+| A supported subscription | Sign in through `/login` |
+| A provider API key | Store it through `/login` or set its environment variable |
+| A local GGUF model | Connect Pi to the llama.cpp router |
+| An OpenAI-, Anthropic-, or Google-compatible endpoint | Add it to `models.json` |
+| A provider with a custom protocol or authentication flow | Build or install a provider extension |
+
+Browse the [model catalog](https://pi.dev/models) for current providers, model IDs, capabilities, context limits, and pricing. Pi starts with its bundled catalog and can overlay newer catalog data from pi.dev. Cached catalog data remains available offline; run `pi update --models` to force a refresh.
+
+## Authenticate
+
+Run `/login` and select a provider. Pi stores credentials in [`auth.json`](configuration.md#agent-directory). Run `/logout` to remove stored credentials for a provider.
+
+You can instead provide an API key through the provider's environment variable. This is useful in CI and other environments where Pi should not write credentials. [Providers](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/providers.md) lists the variables and provider-specific setup.
+
+When several credential sources are configured, Pi uses a runtime `--api-key` first, then a stored `auth.json` credential, an `apiKey` from `models.json`, and finally the provider's environment variables or ambient cloud credentials. Provider extensions can define their own authentication behavior.
+
+Keep `auth.json` and any credential commands private. Project settings and extensions can execute inside the Pi process after you trust a project. Review [Security](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/security.md) before loading configuration from an untrusted directory.
+
+## Select a model
+
+Run `/model` to search available models. The picker shows models whose providers have usable authentication. Press `Ctrl+S` on a model to save it as the default for new sessions.
+
+Run `/thinking` to select the thinking level for the current model. Press `Ctrl+S` there to save the startup level. Pi limits the choices to levels supported by the selected model.
+
+`Ctrl+P` cycles through available models. Use `/scoped-models` to control that cycle and save the selection, or configure model patterns through [Settings](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/settings.md#model-cycling).
+
+A session records model and thinking-level changes. Resuming the session restores them without changing defaults for new sessions.
+
+## Connect local models
+
+Pi integrates directly with the llama.cpp router. The router discovers GGUF files and loads models on demand. Pi's `/llama` command manages the router, while `/model` selects one of its loaded models.
+
+Follow [Local Models with llama.cpp](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/llama-cpp.md) for server startup, model layout, downloads, and connection troubleshooting.
+
+For Ollama, LM Studio, vLLM, SGLang, and other compatible servers, [configure a compatible endpoint](#configure-a-compatible-endpoint) in `models.json`.
+
+## Configure a compatible endpoint
+
+Use [`models.json`](configuration.md#agent-directory) when an endpoint speaks an API Pi already supports. This includes most Ollama, LM Studio, vLLM, SGLang, and proxy deployments.
+
+```json
+{
+  "$schema": "https://pi.dev/schemas/models.schema.json",
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "models": [
+        { "id": "qwen2.5-coder:7b" }
+      ]
+    }
+  }
+}
+```
+
+The dummy key makes the model available to Pi; Ollama ignores it. For an authenticated endpoint, `apiKey` and header values can use `$NAME` or `${NAME}` environment interpolation, a literal value, or a leading `!command`. `$$` and `$!` produce a literal `$` and `!`. Commands in `models.json` run at request time and are not cached by Pi.
+
+Opening `/model` reloads the file. A `models` entry adds or replaces a model with the same ID on that provider. Use `modelOverrides` to change metadata for an existing built-in or extension-provided model without replacing the provider's model list. Unknown override IDs are ignored.
+
+To route a built-in provider through a proxy, set only its `baseUrl`. Its models and authentication stay unchanged:
+
+```json
+{
+  "providers": {
+    "anthropic": { "baseUrl": "https://proxy.example.com/v1" }
+  }
+}
+```
+
+[Models Configuration](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models-configuration.md) lists every field.
+
+### Describe model input and caching
+
+Use `inputLimits.images.resize` to control how Pi encodes new image attachments, `read` results, and tool-result images before storing them in conversation history:
+
+```json
+{
+  "id": "vision-model",
+  "input": ["text", "image"],
+  "inputLimits": {
+    "images": {
+      "resize": {
+        "maxWidth": 1568,
+        "maxHeight": 1568,
+        "maxBytes": 524288,
+        "jpegQuality": 75
+      }
+    }
+  }
+}
+```
+
+`maxBytes` limits the base64-encoded payload. Omitted resize fields use conservative defaults of 2000 by 2000 pixels, 4.5 MiB encoded, and JPEG quality 80. Images are encoded once; changing models does not rewrite historical images. The catalog can also describe hard request limits with `inputLimits.maxRequestBytes`, `images.maxPerMessage`, and `images.maxPerRequest`, but Pi does not yet rewrite or reject history based on them.
+
+<a id="prompt-cache-lifetimes"></a>
+
+Use `promptCache` to declare the provider's best-effort cache lifetime in seconds for the `short` or `long` retention tier:
+
+```json
+{ "id": "claude-sonnet-5", "promptCache": { "short": 300, "long": 3600 } }
+```
+
+Choose the conservative end of any published range. A model without a lifetime for the active tier is not eligible for cache warming. A `modelOverrides` entry can set `inputLimits` or `promptCache` for a built-in or extension model, including a model accessed through a validated proxy. See [`cacheWarming`](settings.md#model-and-thinking).
+
+### Configure sampling by thinking level
+
+OpenAI-compatible APIs support free-form `samplingParams` model defaults and `samplingParamsByThinkingLevel` overrides. The latter uses Pi thinking-level keys (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`), not provider values from `thinkingLevelMap`:
+
+```json
+{
+  "id": "qwen-thinking-model",
+  "reasoning": true,
+  "samplingParams": {
+    "temperature": 1.0,
+    "top_p": 0.95
+  },
+  "samplingParamsByThinkingLevel": {
+    "off": {
+      "temperature": 0.7,
+      "top_p": 0.8
+    },
+    "high": {
+      "top_k": 20
+    }
+  }
+}
+```
+
+Pi first clamps unsupported thinking levels, then merges model `samplingParams`, the effective level's override, and request-level `samplingParams` in that order. Later values win per key. Missing levels inherit the model defaults. `modelOverrides` merges per-level entries per key with the base model. These fields apply only to `openai-completions`, `openai-responses`, and `azure-openai-responses`; other APIs ignore them.
+
+Compatibility settings should describe verified differences in the endpoint's request or response behavior. Do not enable them based only on an endpoint advertising OpenAI or Anthropic compatibility.
+
+## Use classifier models
+
+Classifier models do not chat. They answer typed questions about JSON state: pick one of several choices, answer yes or no, or give a score, each with probabilities. Pi includes TypeSafe's Jev model from these providers, Cloudflare's Clef, Clef Flash, and Clef Omni models from Workers AI and OpenRouter, and OpenAI's GPT-6 Luna through the [Decisions API](https://developers.openai.com/api/docs/guides/decisions):
+
+| Provider | Model IDs | Authentication |
+|---|---|---|
+| `typesafe` | `jev-latest` | `TYPESAFE_API_KEY` |
+| `openrouter` | `typesafe/jev-1.13`, `typesafe/jev-1.14`, `~typesafe/jev-latest`, `cloudflare/clef`, `cloudflare/clef-flash`, `cloudflare/clef-omni` | `OPENROUTER_API_KEY` or `/login` |
+| `cloudflare-workers-ai` | `typesafe/jev`, `typesafe/jev-1.14.0`, `@cf/cloudflare/clef`, `@cf/cloudflare/clef-flash`, `@cf/cloudflare/clef-omni` | `CLOUDFLARE_API_KEY` and `CLOUDFLARE_ACCOUNT_ID` |
+| `vercel-ai-gateway` | `typesafe-ai/jev` | `AI_GATEWAY_API_KEY` |
+| `opencode` | `jev-1.13`, `jev-1.13-free` | `OPENCODE_API_KEY` |
+| `openai` | `gpt-6-luna` | `OPENAI_API_KEY` |
+
+Chat models on a [llama.cpp router](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/llama-cpp.md#classification) are also listed as classifier models.
+
+OpenAI's Decisions API needs an API key. Sign in with ChatGPT credentials do not work with it, so `gpt-6-luna` is not listed as available while `openai` is logged in through `/login`, even when `OPENAI_API_KEY` is set; log out of `openai` to use the key. The API rejects inputs above 922K tokens, but requests that run longer than about five seconds, currently above roughly 600K input tokens, fail with a gateway timeout.
+
+Classifier models do not appear in `/model`. The model reaches them through the [`codemode`](cli.md#enable-codemode) tool, which is off unless an MCP server turned it on. Enable it with `"defaultTools": ["+codemode"]` in [settings](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/settings.md#tools). Scripts then list classifier models with `models.getAvailableOfType("classifier")` and call `models.classify(model, { state, questions })`:
+
+```js
+const jev = await models.getModelOfType("classifier", "typesafe", "jev-latest");
+const result = await models.classify(jev, {
+  state: { message: "The change works, thanks." },
+  questions: {
+    approved: {
+      type: "bool",
+      instructions: "Does the user approve of the result?",
+      criteria: { true: "Approval", false: "No approval" },
+    },
+  },
+});
+return result.answers;
+```
+
+[Codemode](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/codemode.md#classify) describes the question and answer types.
+
+Classifier models whose `input` includes `"image"` also judge images passed in `images`; other classifier models return an error for them. Image input works with GPT-6 Luna, with Jev from `typesafe` and `cloudflare-workers-ai`, with Clef from `cloudflare-workers-ai`, and with the OpenRouter models whose catalog lists image input. Jev takes PNG and JPEG images, and image input is experimental on TypeSafe's own API. Clef takes PNG, JPEG, and WebP images, at most four per request. Jev from `vercel-ai-gateway` and `opencode` takes text only.
+
+Each System One service takes images in its own request format, set by the model's `compat.imageInput`. Built-in models set it, so overriding a provider's `baseUrl` keeps it. A custom provider that proxies another service's classifiers sets it in its provider-level `compat` in `models.json` (see [System One compatibility](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models-configuration.md#typesafe-system-one)). OpenRouter in particular answers requests in TypeSafe's format without an error but drops the images.
+
+When the service reports token counts, as all System One services do, `result.usage` carries them with their cost. Pi adds the usage of a script's classifier calls to the `codemode` tool result, so it counts toward the session cost in the footer and `/session`. The cost uses the model's catalog price; models without one, such as TypeSafe's direct `jev-latest`, report tokens at no cost.
+
+Extensions call classifiers through `ctx.modelRegistry.classify()`, without codemode. [Virtual models](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/virtual-models.md#route-requests) can use them to route requests; see the `jev-router.ts` example.
+
+## Use image models
+
+Image models generate images from a prompt and optional input images. Pi lists OpenRouter's image models, such as `google/gemini-2.5-flash-image` and `black-forest-labs/flux.2-pro`, under the `openrouter` provider; they use the same `OPENROUTER_API_KEY` or `/login` credential as its chat models.
+
+Like classifier models, image models do not appear in `/model`; the model reaches them through the [`codemode`](cli.md#enable-codemode) tool. Scripts list them with `models.getAvailableOfType("image")` and call `models.generateImages(model, { input })`. The result's `output` holds base64 image blocks, which `image()` attaches to the `codemode` result so the model sees them:
+
+```js
+const painter = await models.getModelOfType("image", "openrouter", "google/gemini-2.5-flash-image");
+const result = await models.generateImages(painter, {
+  input: [{ type: "text", text: "A red fox in the snow, watercolor" }],
+});
+if (result.stopReason !== "stop") return result.errorMessage;
+for (const block of result.output) if (block.type === "image") image(block);
+```
+
+`input` can also contain `{ type: "image", data, mimeType }` blocks to edit or use as references. Pi adds the usage of a script's image calls to the `codemode` tool result, like classifier calls. Generated images are not saved to disk. [Codemode](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/codemode.md#generate-images) describes the full API.
+
+Extensions generate images through `ctx.modelRegistry.generateImages()`, without codemode.
+
+## Add a custom provider
+
+Use an extension when the provider needs custom streaming, model discovery, or authentication behavior. See [Custom Providers](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/custom-provider.md) for the extension workflow.
+
+## Troubleshooting
+
+### A model does not appear
+
+Confirm that its provider has usable authentication. Custom models can load from `models.json` but remain unavailable in `/model` until Pi can resolve credentials. For llama.cpp, only models currently loaded by the router appear.
+
+### Authentication works in one shell only
+
+Check whether the key came from an environment variable rather than `auth.json`. Environment variables must be present in the process that starts Pi.
+
+### Sign-in opens a browser on a remote machine
+
+Complete the provider's headless authentication flow when available. Some providers let you paste the final redirect URL or authorization code back into Pi. See [Authenticate interactively](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/providers.md#authenticate-interactively).
+
+### A compatible endpoint rejects requests
+
+Check its API type and compatibility settings in `models.json`. The upstream server must support the corresponding request fields and behavior.
+
+---
+
+Source: <https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models-configuration.md>
+
+# Models Configuration
+
+<!-- This file is generated from TypeScript source. Do not edit it manually; run npm run generate:references. -->
+
+This reference lists the fields of `models.json`. See [Configure a compatible endpoint](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models.md#configure-a-compatible-endpoint) for examples and [Configuration](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/configuration.md#agent-directory) for the file location.
+
+Add `"$schema": "https://pi.dev/schemas/models.schema.json"` to `models.json` for editor validation and completion.
+
+## Providers
+
+Each key under `providers` is a provider ID. A built-in provider ID changes that provider. Any other ID adds a provider, which needs `baseUrl` and an `api` at provider or model level.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Display name. |
+| `baseUrl` | string |  | API base URL. Also applies to the provider's built-in models. |
+| `apiKey` | string |  | Literal key, "$NAME" environment interpolation, or "!command" output. |
+| `api` | string |  | API for the provider's models, such as "openai-completions", "openai-responses", "anthropic-messages", or "google-generative-ai". |
+| `oauth` | `"radius"` |  | OAuth login flow. Requires baseUrl. |
+| `headers` | object |  | Request headers. Values resolve like apiKey. |
+| `compat` | [object](#compatibility) |  | Provider and model compatibility overrides. |
+| `authHeader` | boolean | `false` | Whether to send the resolved API key as Authorization: Bearer. |
+| `models` | [`object[]`](#models) |  |  |
+| `modelOverrides` | [object](#model-overrides) |  |  |
+
+## Models
+
+Each `models` entry adds a model to the provider. An entry whose `id` matches an existing model replaces it.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | string |  | Required. Model ID sent to the API. |
+| `name` | string |  | Display name, also matched by --model patterns. |
+| `api` | string |  | Overrides the provider api. |
+| `baseUrl` | string |  | Overrides the provider baseUrl. |
+| `reasoning` | boolean | `false` | Whether the model supports thinking. |
+| `thinkingLevelMap` | object |  | Provider value sent for each thinking level. null marks a level unsupported. Levels the model does not map use the provider's default value through high; xhigh and max are unsupported. |
+| `input` | `("text" \| "image")[]` | `["text"]` |  |
+| `inputLimits` | [object](#input-limits) |  |  |
+| `cost` | object |  |  |
+| `cost.input` | number |  | Required. Input cost in USD per million tokens. |
+| `cost.output` | number |  | Required. Output cost in USD per million tokens. |
+| `cost.cacheRead` | number |  | Required. Cache-read cost in USD per million tokens. |
+| `cost.cacheWrite` | number |  | Required. Cache-write cost in USD per million tokens. |
+| `cost.tiers` | `object[]` |  | Request-wide pricing tiers. The highest matching input threshold applies to the full request. |
+| `cost.tiers[].inputTokensAbove` | number |  | Required. Use this tier when total request input exceeds this token count. |
+| `cost.tiers[].input` | number |  | Required. Input cost in USD per million tokens. |
+| `cost.tiers[].output` | number |  | Required. Output cost in USD per million tokens. |
+| `cost.tiers[].cacheRead` | number |  | Required. Cache-read cost in USD per million tokens. |
+| `cost.tiers[].cacheWrite` | number |  | Required. Cache-write cost in USD per million tokens. |
+| `promptCache` | object |  | Best-effort prompt cache lifetime in seconds for the short and long retention tiers. Pi warms only tiers with a known lifetime. |
+| `contextWindow` | number | `128000` | Context window in tokens. |
+| `maxTokens` | number | `16384` | Maximum output tokens. |
+| `samplingParams` | object |  | Fields merged into every request body. Applies only to OpenAI-compatible APIs. |
+| `samplingParamsByThinkingLevel` | object |  | samplingParams per thinking level, merged over samplingParams. |
+| `headers` | object |  | Request headers. Values resolve like apiKey. |
+| `compat` | [object](#compatibility) |  | Provider and model compatibility overrides. |
+
+## Model overrides
+
+Each `modelOverrides` key is the ID of a built-in or extension model. Unknown IDs are ignored. Object fields, such as `cost`, merge with the model's value field by field; other fields replace it.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Display name, also matched by --model patterns. |
+| `reasoning` | boolean |  | Whether the model supports thinking. |
+| `thinkingLevelMap` | object |  | Provider value sent for each thinking level. null marks a level unsupported. Levels the model does not map use the provider's default value through high; xhigh and max are unsupported. |
+| `input` | `("text" \| "image")[]` |  |  |
+| `inputLimits` | [object](#input-limits) |  |  |
+| `cost` | object |  |  |
+| `cost.input` | number |  | Input cost in USD per million tokens. |
+| `cost.output` | number |  | Output cost in USD per million tokens. |
+| `cost.cacheRead` | number |  | Cache-read cost in USD per million tokens. |
+| `cost.cacheWrite` | number |  | Cache-write cost in USD per million tokens. |
+| `cost.tiers` | `object[]` |  | Request-wide pricing tiers. The highest matching input threshold applies to the full request. |
+| `cost.tiers[].inputTokensAbove` | number |  | Required. Use this tier when total request input exceeds this token count. |
+| `cost.tiers[].input` | number |  | Required. Input cost in USD per million tokens. |
+| `cost.tiers[].output` | number |  | Required. Output cost in USD per million tokens. |
+| `cost.tiers[].cacheRead` | number |  | Required. Cache-read cost in USD per million tokens. |
+| `cost.tiers[].cacheWrite` | number |  | Required. Cache-write cost in USD per million tokens. |
+| `promptCache` | object |  | Best-effort prompt cache lifetime in seconds for the short and long retention tiers. Pi warms only tiers with a known lifetime. |
+| `contextWindow` | number |  | Context window in tokens. |
+| `maxTokens` | number |  | Maximum output tokens. |
+| `samplingParams` | object |  | Fields merged into every request body. Applies only to OpenAI-compatible APIs. |
+| `samplingParamsByThinkingLevel` | object |  | samplingParams per thinking level, merged over samplingParams. |
+| `headers` | object |  | Request headers. Values resolve like apiKey. |
+| `compat` | [object](#compatibility) |  | Provider and model compatibility overrides. |
+
+## Input limits
+
+See [Describe model input and caching](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models.md#describe-model-input-and-caching).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `maxRequestBytes` | integer |  | Maximum serialized provider request size in bytes. |
+| `images` | object |  |  |
+| `images.resize` | object |  | Cache-safe resize profile applied before a new image enters conversation history. |
+| `images.resize.maxWidth` | integer |  |  |
+| `images.resize.maxHeight` | integer |  |  |
+| `images.resize.maxBytes` | integer |  | Maximum base64-encoded payload size in bytes. |
+| `images.resize.jpegQuality` | integer |  |  |
+| `images.maxPerMessage` | integer |  | Maximum images accepted in one provider message. |
+| `images.maxPerRequest` | integer |  | Maximum images accepted across one provider request. |
+
+## Compatibility
+
+`compat` describes verified differences from an API's standard request and response behavior. Model values override provider values per field. The fields that apply depend on the model's `api`.
+
+### `openai-completions`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `supportsStore` | boolean |  | Whether the provider supports the store field. Default: auto-detected from URL. |
+| `supportsDeveloperRole` | boolean |  | Whether the provider supports the developer role instead of system. Default: auto-detected from URL. |
+| `supportsReasoningEffort` | boolean |  | Whether the provider supports reasoning_effort. Default: auto-detected from URL. |
+| `supportsUsageInStreaming` | boolean | `true` | Whether the provider supports stream_options.include_usage for token usage in streaming responses. |
+| `supportsFinishReason` | boolean | `true` | Whether streamed responses include finish_reason. When false, pi infers stop or toolUse when the stream ends. |
+| `maxTokensField` | `"max_completion_tokens" \| "max_tokens"` |  | Which field to use for max tokens. Default: auto-detected from URL. |
+| `requiresToolResultName` | boolean |  | Whether tool results require the name field. Default: auto-detected from URL. |
+| `requiresAssistantAfterToolResult` | boolean |  | Whether a user message after tool results requires an assistant message in between. Default: auto-detected from URL. |
+| `requiresThinkingAsText` | boolean |  | Whether thinking blocks must be converted to text blocks with &lt;thinking> delimiters. Default: auto-detected from URL. |
+| `requiresReasoningContentOnAssistantMessages` | boolean |  | Whether all replayed assistant messages must include an empty reasoning_content field when reasoning is enabled. Default: auto-detected from URL. |
+| `thinkingFormat` | `"openai" \| "openrouter" \| "deepseek" \| "together" \| "baseten" \| "zai" \| "qwen" \| "chat-template" \| "qwen-chat-template" \| "string-thinking" \| "ant-ling"` |  | Format for reasoning or thinking parameters. When omitted, Pi auto-detects the format from the provider URL. "openai" uses reasoning_effort, "openrouter" uses reasoning.effort, "deepseek" uses thinking.type plus reasoning_effort when supported, "together" uses reasoning.enabled plus reasoning_effort when supported, "baseten" uses configurable chat_template_args plus reasoning_effort when supported, "zai" uses thinking.type, "qwen" uses top-level enable_thinking, "qwen-chat-template" uses chat_template_kwargs.enable_thinking and preserve_thinking, "chat-template" uses configurable chat_template_kwargs, "string-thinking" uses top-level thinking, and "ant-ling" uses reasoning.effort only when the mapped effort is non-null. |
+| `chatTemplateKwargs` | object |  | Kwargs sent as chat_template_kwargs when thinkingFormat is "chat-template". Use $var with "thinking.enabled", "thinking.effort", or "thinking.budget" for pi-controlled values. |
+| `chatTemplateArgs` | object |  | Arguments sent as chat_template_args when thinkingFormat is "baseten". Use $var with "thinking.enabled", "thinking.effort", or "thinking.budget" for pi-controlled values. |
+| `openRouterRouting` | object |  | OpenRouter provider routing preferences. Controls which upstream providers OpenRouter routes requests to. Sent as the provider field in the OpenRouter API request body. See https://openrouter.ai/docs/guides/routing/provider-selection. |
+| `vercelGatewayRouting` | object |  | Vercel AI Gateway routing preferences. Controls which upstream providers the gateway routes requests to. See https://vercel.com/docs/ai-gateway/models-and-providers/provider-options. |
+| `zaiToolStream` | boolean | `false` | Whether z.ai supports top-level tool_stream for streaming tool call deltas. |
+| `thinkingTokenBudgetField` | `"thinking_token_budget" \| "thinking_budget" \| "thinking_budget_tokens"` |  | Top-level request field used to cap reasoning tokens from thinkingBudgets. Reasoning and the answer share max_tokens on these endpoints. "thinking_token_budget" is vLLM, "thinking_budget" is Qwen, DashScope, or SGLang, and "thinking_budget_tokens" is llama.cpp. Off by default and not set on the generated catalog. |
+| `supportsThinkingTokenBudget` | boolean | `false` | Alias for thinkingTokenBudgetField: "thinking_token_budget" (vLLM). Prefer thinkingTokenBudgetField. |
+| `supportsOpenAIGrammarTools` | boolean | `false` | Whether the provider supports OpenAI custom tools with Lark or regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. The generated catalog enables this for capable models. |
+| `supportsMidConvoSystemMessages` | boolean | `false` | Whether the exact model accepts system or developer messages after the conversation has started. When false, later system messages are folded into the leading system message. The generated catalog enables this for verified models. |
+| `supportsMidConvoToolAdditions` | boolean | `false` | Whether system messages can introduce additional tools mid-conversation. Requires supportsMidConvoSystemMessages. The generated catalog enables this for capable models. |
+| `supportsStrictMode` | boolean | `false` | Whether the provider supports the strict field in tool definitions. Generated capable models enable it explicitly. |
+| `cacheControlFormat` | `"anthropic"` |  | Cache control convention for prompt caching. Anthropic applies cache_control markers to the system prompt, last tool definition, and last user, assistant, or tool-result text content. |
+| `sendSessionAffinityHeaders` | boolean |  | Whether to send session-affinity data from options.sessionId. Default: true for OpenRouter endpoints, false otherwise. |
+| `sessionAffinityFormat` | `"openai" \| "openai-nosession" \| "openrouter"` |  | Session-affinity header format. openai sends session_id, x-client-request-id, and x-session-affinity; openai-nosession sends x-client-request-id and x-session-affinity; openrouter sends x-session-id. Does not affect prompt_cache_key. Default: auto-detected. |
+| `supportsLongCacheRetention` | boolean |  | Whether the provider supports long prompt cache retention (prompt_cache_retention: "24h" or Anthropic-style cache_control.ttl: "1h", depending on format). Default: auto-detected from provider and URL. |
+| `vllmPriority` | number |  | vLLM scheduler priority sent as the top-level priority request field. Lower values are handled earlier and the server default is 0. Only meaningful with --scheduling-policy priority. Off by default and not set on the generated catalog. |
+
+### `openai-responses`
+
+Also applies to `azure-openai-responses` and `openai-codex-responses`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `supportsDeveloperRole` | boolean | `true` | Whether the provider supports the developer role instead of system. |
+| `supportsMidConvoSystemMessages` | boolean | `false` | Whether the exact model accepts developer or system messages after the conversation has started. When false, later system messages are folded into the leading system message. The generated catalog enables this for verified models. |
+| `sessionAffinityFormat` | `"openai" \| "openai-nosession" \| "openrouter"` |  | Session-affinity header format. openai sends session_id and x-client-request-id; openai-nosession sends x-client-request-id; openrouter sends x-session-id. Does not affect prompt_cache_key. Default: auto-detected. |
+| `supportsLongCacheRetention` | boolean | `true` | Whether the provider supports long prompt cache retention. This uses prompt_cache_options.ttl: "30m" on GPT-5.6+ and prompt_cache_retention: "24h" on earlier models. |
+| `supportsStrictMode` | boolean |  | Whether the provider supports strict JSON-schema function tools. Defaults are API-specific; generated OpenAI models enable it explicitly. |
+| `supportsOpenAIGrammarTools` | boolean | `false` | Whether to emit OpenAI custom tools with Lark or regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. The generated catalog enables this for capable models. |
+| `supportsAdditionalTools` | boolean | `false` | Whether the model supports message-anchored additional_tools input items. |
+| `supportsToolSearch` | boolean | `false` | Whether the model supports client-executed tool search for transcript-anchored additions. |
+| `supportsExplicitPromptCacheMode` | boolean | `false` | Whether the model accepts prompt_cache_options. Older OpenAI models reject the parameter. |
+| `supportsMidConvoEffort` | boolean | `false` | Whether thinking level changes are sent as configuration_update input items instead of changing reasoning.effort, so a change keeps the prompt cache. Only used by the openai-responses API, and ignored with Sign in with ChatGPT on the openai provider. |
+| `supportsMaxOutputTokens` | boolean | `true` | Whether the provider accepts max_output_tokens. Some Codex-protocol gateways reject it. |
+
+### `anthropic-messages`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `supportsEagerToolInputStreaming` | boolean | `true` | Whether the provider accepts per-tool eager_input_streaming. When false, the Anthropic provider omits tools[].eager_input_streaming and sends the legacy fine-grained-tool-streaming-2025-05-14 beta header for tool-enabled requests. |
+| `supportsLongCacheRetention` | boolean | `true` | Whether the provider supports Anthropic long cache retention through cache_control.ttl. |
+| `sendSessionAffinityHeaders` | boolean |  | Whether to send x-session-affinity from options.sessionId when caching is enabled. Required for providers like Fireworks that use session affinity for prompt cache routing; requests to the same replica maximize cache hits. Default: true for OpenRouter endpoints, false otherwise. |
+| `sessionAffinityFormat` | `"openrouter"` |  | Session-affinity format. openrouter sends x-session-id; when unset, sends x-session-affinity. |
+| `supportsCacheControlOnTools` | boolean | `true` | Whether the provider supports Anthropic-style cache_control markers on tool definitions. When false, cache_control is omitted from tool parameters. Some Anthropic-compatible providers, such as Fireworks, do not support this field on tools and may reject or ignore it. |
+| `supportsTemperature` | boolean | `true` | Whether the model accepts the Anthropic temperature request field. Claude Opus 4.7+ rejects non-default values. |
+| `forceAdaptiveThinking` | boolean | `false` | Whether to force adaptive thinking (thinking.type: adaptive plus output_config.effort) regardless of model ID. Built-in models that require adaptive thinking set this in generated metadata. Custom Anthropic-compatible providers can set this to true for any model whose upstream requires the adaptive format. Set false to opt out on overridden built-in models. |
+| `allowEmptySignature` | boolean | `false` | Whether to replay empty thinking signatures instead of converting thinking to text. |
+| `supportsStrictTools` | boolean | `false` | Whether the provider supports Anthropic strict tool schemas. Generated Anthropic models enable it explicitly. |
+| `supportsMidConvoEffort` | boolean | `false` | Whether the exact model transport supports effort-only system messages and thinking binding controls. |
+| `supportsMidConvoSystemMessages` | boolean | `false` | Whether the exact model accepts system-role messages inside the conversation. When false, later system messages are folded into the top-level system prompt. |
+| `supportsMidConvoToolChanges` | boolean | `false` | Whether the exact model accepts mid-conversation tool_addition and tool_removal blocks. Requires supportsMidConvoSystemMessages. |
+| `allowedFallbackModels` | `object[]` |  | Models Anthropic accepts for server-side refusal fallback, with local pricing metadata for returned fallback responses. When absent or empty, callers must omit fallbacks; Anthropic rejects the field for models with no permitted fallback targets. |
+
+### `bedrock-converse-stream`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `supportsStrictMode` | boolean | `false` | Whether the model supports Bedrock strict tool schemas. |
+
+### `mistral-conversations`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `supportsMidConvoSystemMessages` | boolean | `false` | Whether the exact model accepts system messages after the conversation has started. When false, later system messages are folded into the leading system message. |
+
+### `typesafe-system-one`
+
+Also applies to `cloudflare-workers-ai-system-one`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `imageInput` | `"assets" \| "images" \| "state-image-urls"` |  | How the service takes classifier images. "assets" sends TypeSafe's assets map (PNG and JPEG) and references the images from the state, as TypeSafe and Jev on Workers AI expect. "images" sends Clef's images list of data URLs (PNG, JPEG, and WebP, at most four), as Clef on Workers AI expects. "state-image-urls" places image_url parts before the state, as OpenRouter expects; OpenRouter drops assets without an error. Auto-detected from the provider, baseUrl, and model ID. Classifier models read it from the provider-level compat; models and modelOverrides entries apply to chat models only. |
+| `sendImageOptInHeader` | boolean |  | Whether requests with images send the TypeSafe-Danger-Zone-Images: true header, which TypeSafe's own API requires for its experimental image input. Defaults to true for the typesafe-system-one API unless the model is detected as OpenRouter. |
+
+---
+
+Source: <https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/custom-provider.md>
+
+# Custom Providers
+
+A provider extension connects Pi to a model service that needs custom authentication, model discovery, request handling, or streaming. If the service already speaks a supported API, configure it in `models.json` instead.
+
+Provider extensions run inside Pi and can inspect credentials, prompts, tool definitions, model responses, and usage. Treat them as trusted code and avoid logging secrets or provider payloads.
+
+## Choose the smallest integration
+
+| Requirement | Use |
+|---|---|
+| Add models behind a supported API | [`models.json`](models.md#configure-a-compatible-endpoint) |
+| Change an existing provider endpoint or headers | `models.json` or a small provider extension |
+| Discover models dynamically | A provider with `refreshModels` |
+| Add a `/login` flow | A provider with native or legacy OAuth configuration |
+| Implement an unsupported wire protocol | A provider with `stream` or `streamSimple` |
+
+A provider extension is an [extension](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/extensions.md), so it follows the same loading, trust, reload, and error behavior.
+
+## Register a provider
+
+Call `pi.registerProvider()` from the extension factory. Pi waits for asynchronous factories before startup continues, so providers registered there are available to startup model selection and `pi --list-models`.
+
+There are two registration forms:
+
+- Register a complete `Provider` from `@earendil-works/pi-ai` for native authentication, filtering, discovery, refresh, and streaming behavior.
+- Register a provider name with `ProviderConfig` for the legacy configuration form used by existing extensions.
+
+Prefer a complete provider for new integrations that own more than static endpoint and model metadata. Pi composes `models.json` overrides above a registered native provider.
+
+Registering only `baseUrl` or `headers` for an existing provider preserves its built-in models. Supplying `models` in the legacy form replaces that provider's models across chat, image, and classifier operations. An omitted `type` means `"chat"`; image and classifier models require explicit discriminants and implementations keyed by their `api` values through the `images` and `classifiers` fields.
+
+### Redirect an existing provider
+
+Register only the fields that should change. This keeps the provider's built-in catalog, authentication, API implementation, and compatibility settings:
+
+```typescript
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+  pi.registerProvider("anthropic", {
+    baseUrl: "https://gateway.example.com/anthropic",
+    headers: {
+      "X-Gateway-Key": "$GATEWAY_API_KEY",
+    },
+  });
+}
+```
+
+Use this form for a proxy or gateway that preserves the upstream protocol. Do not copy the built-in model list into the extension because doing so turns a small endpoint override into a catalog replacement that can drift.
+
+### Register a compatible endpoint
+
+When a service implements a supported protocol but has its own model catalog, register the endpoint and only the models the service actually exposes:
+
+```typescript
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+  pi.registerProvider("acme", {
+    name: "Acme AI",
+    baseUrl: "https://api.acme.example/v1",
+    apiKey: "$ACME_API_KEY",
+    api: "openai-completions",
+    models: [
+      {
+        type: "chat",
+        id: "acme-chat",
+        name: "Acme Chat",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 8192,
+      },
+    ],
+  });
+}
+```
+
+Prefer `models.json` for this case when no executable extension behavior is needed. Use an extension when registration depends on runtime discovery, custom authentication, or code shared with other extension features.
+
+### Register mixed-operation models
+
+A mixed-operation provider can register non-chat models and their implementations together:
+
+```typescript
+pi.registerProvider("media-tools", {
+  apiKey: "$MEDIA_TOOLS_API_KEY",
+  models: [
+    {
+      type: "image",
+      id: "image-v1",
+      name: "Image V1",
+      api: "media-images",
+      baseUrl: "https://media.example.com/v1",
+      input: ["text"],
+      output: ["image"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    },
+    {
+      type: "classifier",
+      id: "classifier-v1",
+      name: "Classifier V1",
+      api: "media-classifier",
+      baseUrl: "https://media.example.com/v1",
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 64000,
+    },
+  ],
+  images: {
+    "media-images": { generateImages: async (model, context, options) => result },
+  },
+  classifiers: {
+    "media-classifier": { classify: async (model, context, options) => result },
+  },
+});
+```
+
+Model-level `baseUrl` values take precedence over the provider endpoint. If no `models` list is supplied, built-in models of every operation remain registered. Equal model IDs in different operations remain distinct, including their model-specific headers.
+
+Calls made after initial extension loading take effect immediately. Use `pi.unregisterProvider()` to remove the dynamic provider and restore built-in behavior that it replaced.
+
+See the checked [GitLab Duo provider](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/examples/extensions/custom-provider-gitlab-duo/) for a complete registration that delegates streaming to built-in API implementations.
+
+## Provide authentication
+
+Static providers can resolve an API key from a literal, environment interpolation, or a command. These values use the same syntax as `models.json`:
+
+- `$NAME` and `${NAME}` read environment variables.
+- A leading `!command` uses command output.
+- `$$` emits a literal `$`.
+- `$!` emits a literal leading `!`.
+
+Use native provider authentication when the integration needs stored credentials, custom resolution, provider-scoped environment, or multiple login methods.
+
+An OAuth provider supplies a display name, login flow, token refresh, and access-token resolution. After registration it appears in `/login`, and Pi stores returned credentials in `~/.pi/agent/auth.json`.
+
+OAuth callbacks are UI-neutral. They can open an authorization URL, show a device code, report progress, request input, or ask the user to choose a login method. Honor cancellation and the supplied abort signal during network requests.
+
+Press Enter (`tui.select.confirm`) to open the device-login URL and copy the code, or log in manually. Providers can disable either action with `openBrowserOnConfirm: false` or `copyCodeOnConfirm: false` in `onDeviceCode` or native `AuthEvent` notifications.
+
+Never write access tokens, refresh tokens, authorization headers, or complete provider responses to ordinary logs.
+
+## Supply and refresh models
+
+Every model needs an ID, display name, input capabilities, and cost metadata. Chat and classifier models also need a context window; chat models need an output limit and reasoning support; image models declare their output modalities. Choose the API implementation at the provider level unless one model requires an override.
+
+Set `promptCache.short` or `promptCache.long` to the provider's best-effort cache lifetime in seconds when Pi should keep an idle prompt cache warm. Leave them unset to disable cache warming for that retention tier.
+
+Compatibility flags describe verified differences in an otherwise supported API. Do not enable them based only on an endpoint claiming compatibility.
+
+Confirm the request fields and response behavior against the actual server.
+
+Use `refreshModels` when the available catalog comes from a live service. Pass `context.signal` to blocking I/O so callers can cancel refreshes.
+
+The two registration forms have different refresh contracts:
+
+- A complete `Provider` returns nothing. It calls `context.publish({ update })` to install provider-owned model state, after which its synchronous `getModels()` exposes the latest list.
+- Legacy `ProviderConfig.refreshModels` returns mixed-operation model definitions. Pi replaces that registration’s live models with the returned list and applies any requested persistence.
+
+Publish persisted catalog data only when it should survive across runs. A live service such as llama.cpp can update its in-memory list without persisting it; a remote catalog can retain a snapshot for offline startup.
+
+## Reuse a supported streaming API
+
+Use one of Pi AI’s API implementations whenever the provider protocol matches it.
+
+Supported implementations cover Anthropic Messages, OpenAI Chat Completions and Responses, Google Generative AI and Vertex, Azure OpenAI Responses, Mistral Conversations, and Bedrock Converse.
+
+The provider can still customize authentication, base URLs, headers, model filtering, and discovery while delegating request conversion and streaming to an existing API implementation.
+
+This is safer than copying a stream implementation because it preserves Pi’s message conversion, tool handling, usage accounting, cancellation, and compatibility behavior.
+
+## Implement custom streaming
+
+Implement `streamSimple` only when no existing API implementation can represent the service. Study the implementations under [`packages/ai/src/api`](https://github.com/earendil-works/pi/tree/main/packages/ai/src/api) first.
+
+The stream receives a normalized `TranscriptContext`. System prompts and tool declarations live in transcript system messages, so read them with `getCurrentSystemPrompt(context.messages)` and `getCurrentTools(context.messages)` rather than expecting `context.systemPrompt` or `context.tools`. A model that supports mid-conversation system messages can receive them in place; otherwise call `collapseSystemMessages(context)` to fold later system messages into the leading one.
+
+A custom stream must:
+
+1. Create an assistant message with provider, model, timestamp, pending stop reason, content, and zeroed usage.
+2. After request setup succeeds, emit one `start` event before content events.
+3. Update the message while emitting balanced text, thinking, and tool-call events.
+4. Finalize usage, cost, content, and stop reason.
+5. Emit exactly one terminal `done` or `error` event and close the stream.
+6. Convert cancellation into an aborted result.
+
+Request setup can fail before `start`; in that case the stream can terminate directly with `error`. Missing request authentication may also throw synchronously before a stream is returned.
+
+Content indexes refer to blocks in the assistant message. Update each block before emitting the event whose `partial` field exposes that state. Tool-call arguments must contain valid parsed input by `toolcall_end`.
+
+The stream must also honor request instrumentation supplied through `SimpleStreamOptions`:
+
+- Call `options.onPayload` before sending the provider request and use any replacement payload it returns.
+- Call `options.onResponse` after receiving the response but before consuming its body.
+- Await `options.onProviderStreamEvent?.(providerEvent, model)` for each parsed provider event before normalizing it.
+- Pass through the abort signal and provider-scoped environment.
+
+These hooks power extension request inspection, response-header events, and provider-stream observation. Omitting them makes the provider behave differently from Pi’s built-in providers.
+
+## Report failures and usage
+
+Set a concrete terminal stop reason. Error and aborted messages need an `errorMessage`; successful messages need accurate input, output, cache, total-token, and cost values.
+
+Pi can compact and retry after recognized context-overflow errors. If the service uses an unknown message, normalize only that provider’s overflow response to `context_length_exceeded` in a guarded `message_end` handler.
+
+Do not rewrite rate limits or transient provider failures as context overflow. Those failures use Pi’s normal retry behavior instead.
+
+## Test the integration
+
+Test at least:
+
+- ordinary and empty text responses
+- tool calls and tool results
+- image input and image tool results when supported
+- usage and cost accounting
+- abort behavior
+- context overflow
+- malformed or partial streams
+- Unicode boundaries
+- cross-provider session handoff
+- authentication refresh and cancellation
+
+The provider tests under [`packages/ai/test`](https://github.com/earendil-works/pi/tree/main/packages/ai/test) define the behavior expected from built-in providers. Adapt the relevant suites rather than relying only on manual prompts.
+
+Run the extension directly while developing, then move it to a discovered extension location or distribute it through a [Pi package](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/packages.md). Use `/reload` after changing a discovered provider extension in an active session.
