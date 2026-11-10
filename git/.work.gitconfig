@@ -1,6 +1,0 @@
-[user]
-    name = "work"
-    email = "work@email.com"
-
-[commit]
-    template = "~/workspace/mxy/toolbox/git/commit-msg-work.txt"

@@ -1,39 +1,33 @@
 # scripts/
 
-个人运维脚本集，按场景分类。
+个人工具脚本，按使用场景分类。
 
-## 备份 & 迁移
-
-| 脚本 | 用途 | 用法 |
-|------|------|------|
-| `docker-migrate.sh` | docker-compose 项目跨机器迁移 | `-t y7000p -c ./project`，自动导出镜像+volume+配置 |
-| `koodo-backup.sh` | Koodo Reader 数据备份 | 对齐应用内 backupFromPath 逻辑，输出日期 zip |
-
-## 同步
+## rclone 挂载
 
 | 脚本 | 用途 | 用法 |
 |------|------|------|
-| `sync.sh` | jj 仓库同步到 rclone 远程 | `sync.sh <jj-repo-path>`，自动增量推送 |
-| `rclone.sh` | rclone 挂载 OpenList（Linux） | 重试 + 健康检查，挂载到 `~/rclone/alist` |
-| `rclone.ps1` | rclone 挂载 alist（Windows） | PowerShell，配合 `task.ps1` 注册计划任务 |
-| `task.ps1` | Windows 计划任务注册/删除 | 注册 `rclone.ps1` 为登录自启任务 |
+| `rclone.sh` | Linux 下挂载 OpenList | 配置 rclone 的 `alist:` 远程，创建 `~/rclone/alist` 目录后运行；脚本检查本机 5244 端口并在前台挂载 |
+| `rclone.ps1` | Windows 下挂载 alist | 配置 `alist:` 远程后运行，挂载为 `Z:`，缓存放在 `D:\alist-cache` |
 
-## 启动
+挂载路径和远程名称目前在脚本中配置，使用前按本机环境调整。Windows restic 配置可能依赖 `Z:` 挂载，修改时需同步核对。
+
+## 安装工具
 
 | 脚本 | 用途 | 用法 |
 |------|------|------|
-| `start.sh` | 启动 image-tools 项目 | `cd` 到项目目录并执行 `just load` |
+| `install-mouseless.sh` | 安装 Mouseless 并启用系统服务 | `bash install-mouseless.sh`；支持通过 `BIN_DIR`、`SERVICE_DIR`、`CONFIG` 指定安装和配置路径，下载 Linux amd64 版本 |
 
 ## Shell 工具函数
 
 | 脚本 | Shell | 功能 |
 |------|-------|------|
-| `init.zsh` | zsh | `paru_update`（fzf 选包更新）、`paru_clean`（清理无用包）、`update_mirrors`（测速更新镜像源）、`lt`（lsd 树形显示） |
-| `custom.nu` | nushell | `update_docker_context`（WSL 下更新 Docker context 指向 Windows 端） |
+| `custom.nu` | Nushell | 在 Windows 下将 Docker context 指向 WSL 中的 Docker，并设置使用 Scoop cwrsync SSH 的 `rsync` 别名 |
 
 ## 依赖
 
-- `docker-migrate.sh`: docker, rsync, jq, alpine 镜像（volume 导出用）
-- `sync.sh`: jj, rclone
-- `rclone.sh`: rclone
-- `init.zsh`: paru, fzf, rate-mirrors, lsd
+- `rclone.sh`：rclone、xh、umount，以及可访问的本机 OpenList 服务。
+- `rclone.ps1`：PowerShell、rclone 及其 Windows 挂载依赖。
+- `install-mouseless.sh`：curl、tar、sudo、systemd。
+- `custom.nu`：Nushell、WSL、Docker CLI、Scoop cwrsync。
+
+Arch Linux 软件包清单位于 [`../packages/pkglist-all.txt`](../packages/pkglist-all.txt)。
