@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cd ~/workspace/mxy/image-tools && just load
+cd ~/workspace/mxy/toolbox/image-tools && just load

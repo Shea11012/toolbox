@@ -21,7 +21,7 @@ Options:
   -h, --help             显示帮助
 
 示例:
-  $(basename "$0") -t y7000p -c ~/workspace/mxy/config/image-tools
+  $(basename "$0") -t y7000p -c ~/workspace/mxy/toolbox/image-tools
   $(basename "$0") -e -c ~/projects/myapp
   $(basename "$0") -i -t y7000p -c ~/projects/myapp
 EOF

@@ -3,4 +3,4 @@
     email = "work@email.com"
 
 [commit]
-    template = "~/workspace/mxy/config/editor/git/commit-msg-work.txt"
+    template = "~/workspace/mxy/toolbox/git/commit-msg-work.txt"
